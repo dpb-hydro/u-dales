@@ -41,7 +41,7 @@ build_type=$2
 
 if [ $system == "icl" ]
 then
-    module load intel/2025a netCDF/4.9.2-iimpi-2023a netCDF-Fortran/4.6.1-iimpi-2023a FFTW/3.3.9-intel-2021a CMake/3.29.3-GCCcore-13.3.0 git/2.45.1-GCCcore-13.3.0
+    module load intel/2023a netCDF/4.9.2-iimpi-2023a netCDF-Fortran/4.6.1-iimpi-2023a FFTW/3.3.9-intel-2021a CMake/3.29.3-GCCcore-13.3.0 git/2.45.1-GCCcore-13.3.0
     FC=mpiifort
     NETCDF_DIR=/sw-eb/software/netCDF/4.9.2-iimpi-2023a
     NETCDF_FORTRAN_DIR=/sw-eb/software/netCDF-Fortran/4.6.1-iimpi-2023a
