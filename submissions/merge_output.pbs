@@ -1,0 +1,12 @@
+#!/bin/bash
+#PBS -N udales_525_merge
+#PBS -l select=1:ncpus=1:mem=4gb
+#PBS -l walltime=00:10:00
+#PBS -j oe
+#PBS -o udales_525_merge.log
+
+cd $PBS_O_WORKDIR
+
+module load NCO/5.2.9-foss-2024a
+
+u-dales/tools/gather_outputs.sh outputs/525

@@ -1,0 +1,18 @@
+#!/bin/bash
+#PBS -N udales_525_run
+#PBS -l select=1:ncpus=32:mem=32gb
+#PBS -l walltime=01:00:00
+#PBS -j oe
+#PBS -o udales_525_run.log
+
+cd $PBS_O_WORKDIR
+
+module load intel/2023a netCDF/4.9.2-iimpi-2023a netCDF-Fortran/4.6.1-iimpi-2023a FFTW/3.3.9-intel-2021a
+
+export DA_TOOLSDIR=$(pwd)/u-dales/tools
+export DA_BUILD=$(pwd)/u-dales/build/release/u-dales
+export NCPU=32
+export DA_WORKDIR=$(pwd)/outputs
+
+rm -rf outputs/525
+./u-dales/tools/local_execute.sh u-dales/examples/525

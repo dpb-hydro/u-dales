@@ -1,0 +1,10 @@
+#!/bin/bash
+#PBS -N udales_build
+#PBS -l select=1:ncpus=4:mem=8gb
+#PBS -l walltime=00:30:00
+#PBS -j oe
+#PBS -o udales_build.log
+
+cd $PBS_O_WORKDIR
+cd u-dales
+tools/build_executable.sh icl release
