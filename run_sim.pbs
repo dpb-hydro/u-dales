@@ -1,0 +1,27 @@
+#!/bin/bash
+#PBS -N udales_run
+#PBS -l select=1:ncpus=8:mem=24gb
+#PBS -l walltime=02:00:00
+#PBS -j oe
+#PBS -o udales_run.log
+
+# Load shared software
+module load intel/2023a netCDF/4.9.2-iimpi-2023a netCDF-Fortran/4.6.1-iimpi-2023a FFTW/3.3.9-intel-2021a
+
+# Number of CPUs and job name
+export NCPU=8
+EXPNAME=603
+
+# Set folder names
+PROJECT_DIR=$HOME/uDALES
+export DA_TOOLSDIR=$PROJECT_DIR/u-dales/tools
+export DA_BUILD=$PROJECT_DIR/u-dales/build/release/u-dales
+export DA_WORKDIR=$TMPDIR/outputs
+
+# Run simulation
+mkdir -p $DA_WORKDIR
+$PROJECT_DIR/u-dales/tools/local_execute.sh $PROJECT_DIR/u-dales/examples/$EXPNAME || exit 1
+
+# Copy outputs to EPHEMERAL
+mkdir -p $EPHEMERAL/uDALES/outputs
+cp -r $TMPDIR/outputs/$EXPNAME $EPHEMERAL/uDALES/outputs/
