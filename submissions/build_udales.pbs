@@ -12,7 +12,7 @@ cd "$PBS_O_WORKDIR/u-dales"
 module load intel/2023a \
             netCDF/4.9.2-iimpi-2023a \
             netCDF-Fortran/4.6.1-iimpi-2023a \
-            imkl-FFTW/2023.1.0-iimpi-2023a \
+            FFTW/3.3.10-GCC-12.3.0 \
             CMake/3.26.3-GCCcore-12.3.0 \
             git/2.41.0-GCCcore-12.3.0-nodocs
 
