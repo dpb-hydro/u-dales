@@ -5,6 +5,29 @@
 #PBS -j oe
 #PBS -o udales_build.log
 
-cd $PBS_O_WORKDIR
-cd u-dales
-tools/build_executable.sh icl release
+set -euo pipefail
+
+cd "$PBS_O_WORKDIR/u-dales"
+
+module load intel/2023a \
+            netCDF/4.9.2-iimpi-2023a \
+            netCDF-Fortran/4.6.1-iimpi-2023a \
+            imkl-FFTW/2023.1.0-iimpi-2023a \
+            CMake/3.26.3-GCCcore-12.3.0 \
+            git/2.41.0-GCCcore-12.3.0-nodocs
+
+# Install prefixes come from the EasyBuild variables set by the modules
+NETCDF_DIR="${EBROOTNETCDF:?netCDF module not loaded}"
+NETCDF_FORTRAN_DIR="${EBROOTNETCDFMINFORTRAN:?netCDF-Fortran module not loaded}"
+
+BUILD_DIR="$PWD/build/release"
+mkdir -p "$BUILD_DIR"
+cd "$BUILD_DIR"
+
+FC=mpiifort cmake \
+    -DNETCDF_DIR="$NETCDF_DIR" \
+    -DNETCDF_FORTRAN_DIR="$NETCDF_FORTRAN_DIR" \
+    -DCMAKE_BUILD_TYPE=Release \
+    ../../ 2>&1 | tee config.log
+
+make -j"${NCPUS:-4}" 2>&1 | tee build.log
