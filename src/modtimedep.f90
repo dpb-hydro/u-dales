@@ -75,9 +75,8 @@ contains
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   subroutine inittimedep
     use modmpi,    only :myid,my_real,mpi_logical,mpierr,comm3d
-    use modglobal, only :cexpnr,kb,ke,kh,kmax,ifinput,runtime,zf,skyLW,nfcts
+    use modglobal, only :cexpnr,kb,ke,kh,kmax,ifinput,skyLW,nfcts
     use modibmdata, only : bctfxm, bctfxp, bctfym, bctfyp, bctfz!, bctfzf
-    use modfields, only: thlprof
     !use initfac, only : netsw !Should probably be moved to somewhere else
 
     implicit none
@@ -85,7 +84,6 @@ contains
     character (80):: chmess
     character (1) :: chmess1
     integer :: k,t,n,ierr
-    real :: dummyr
     real, allocatable, dimension (:) :: height
 
     ltimedep = (ltimedepsurf .or. ltimedepnudge) .or. (ltimedeplw .or. ltimedepsw)
@@ -251,13 +249,18 @@ contains
     end if !ltimedeplw
 
     if (ltimedepsw) then
-      allocate(timesw(1:ntimedepsw))
-      allocate(netswt(1:nfcts, 1:ntimedepsw))
-
-      timesw = 0.
-      netswt = 0.
-
+      ! The shortwave history netswt(nfcts, ntimedepsw) is only ever used by rank 0:
+      ! timedepsw (the time interpolation) returns immediately on all other ranks and
+      ! the interpolated netsw feeds the facet energy balance, which rank 0 evaluates
+      ! alone (modEB) before broadcasting the facet temperatures. Holding the table on
+      ! every rank costs nfcts*ntimedepsw*8 bytes per rank (1 GB for a city-scale case
+      ! with a diurnal forcing) for no purpose, so it is read and kept on rank 0 only.
       if (myid == 0) then
+        allocate(timesw(1:ntimedepsw))
+        allocate(netswt(1:nfcts, 1:ntimedepsw))
+        timesw = 0.
+        netswt = 0.
+
         ! Read shortwave
         open (ifinput,file='timedepsw.inp.'//cexpnr)
         read (ifinput,'(a80)') chmess ! first line is a description of the file
@@ -270,9 +273,6 @@ contains
         !write(*,*) "read timedepsw"
 
       end if !myid==0
-
-      call MPI_BCAST(timesw, ntimedepsw, MY_REAL, 0, comm3d, mpierr)
-      call MPI_BCAST(netswt, ntimedepsw*nfcts, MY_REAL, 0, comm3d, mpierr)
 
     end if ! timedepsw
 
@@ -319,7 +319,6 @@ contains
   end subroutine timedep
 
   subroutine timedepsurf
-    use modmpi,     only : myid
     use modglobal,  only : timee
     use modibmdata, only : bctfxm, bctfxp, bctfym, bctfyp, bctfz!, bctfzf
     implicit none
@@ -358,11 +357,10 @@ contains
 
   subroutine timedepnudge
     use modfields,   only : thlprof, qtprof, uprof, vprof
-    use modglobal,   only : timee,dzf,dzh,kb,ke,kh,kmax
-    use modmpi,      only : myid
+    use modglobal,   only : timee
 
     implicit none
-    integer t,k
+    integer t
     real fac
 
     if(.not.(ltimedepnudge)) return
@@ -397,10 +395,9 @@ contains
 
   subroutine timedeplw
     use modglobal,    only : timee, skyLW, rk3step, tnextEB
-    use modmpi,       only : myid
 
     implicit none
-    integer t,k
+    integer t
     real fac
 
     if(.not.(ltimedeplw)) return

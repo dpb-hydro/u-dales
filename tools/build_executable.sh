@@ -17,9 +17,9 @@
 
 # Copyright (C) 2016-2019 the uDALES Team.
 
-set -e
+set -euo pipefail
 
-# Usage: ./tools/build_executable.sh [icl, archer, cca, common] [debug, release]
+# Usage: ./tools/build_executable.sh [icl, hx1, archer, cca, common] [debug, release]
 
 if [ ! -d src ]; then
     echo "Please run this script from being inside the u-dales folder"
@@ -43,15 +43,28 @@ if [ $system == "icl" ]
 then
     module load intel/2023a netCDF/4.9.2-iimpi-2023a netCDF-Fortran/4.6.1-iimpi-2023a FFTW/3.3.9-intel-2021a CMake/3.29.3-GCCcore-13.3.0 git/2.45.1-GCCcore-13.3.0
     FC=mpiifort
-    NETCDF_DIR=/sw-eb/software/netCDF/4.9.2-iimpi-2023a
-    NETCDF_FORTRAN_DIR=/sw-eb/software/netCDF-Fortran/4.6.1-iimpi-2023a
+    NETCDF_DIR=/sw-eb/software/netCDF/4.8.0-iimpi-2021a
+    NETCDF_FORTRAN_DIR=/sw-eb/software/netCDF-Fortran/4.5.3-iimpi-2021a
+
+elif [ $system == "hx1" ]
+then
+    # Imperial HX1. It has its own EasyBuild tree (/gpfs/easybuild/prod) rather
+    # than CX3's /sw-eb, and it carries no iimpi-2021a netCDF at all, so the
+    # "icl" module list cannot resolve here. intel/2023a is the oldest Intel
+    # toolchain on HX1 with a complete netCDF + netCDF-Fortran pair.
+    module load intel/2023a netCDF/4.9.2-iimpi-2023a netCDF-Fortran/4.6.1-iimpi-2023a FFTW/3.3.10-intel-compilers-2023.1.0 CMake/3.26.3-GCCcore-12.3.0 git/2.41.0-GCCcore-12.3.0-nodocs
+    FC=mpiifort
+    NETCDF_DIR=/gpfs/easybuild/prod/software/netCDF/4.9.2-iimpi-2023a
+    NETCDF_FORTRAN_DIR=/gpfs/easybuild/prod/software/netCDF-Fortran/4.6.1-iimpi-2023a
 
 elif [ $system == "archer" ]
 then
     module load cmake cray-hdf5 cray-netcdf cray-fftw
     FC=ftn
-    NETCDF_DIR=$NETCDF_DIR
-    NETCDF_FORTRAN_DIR=$NETCDF_FORTRAN_DIR
+    #NETCDF_DIR=$NETCDF_DIR
+    #NETCDF_FORTRAN_DIR=$NETCDF_FORTRAN_DIR
+    NETCDF_DIR=/opt/cray/pe/netcdf/4.9.0.7/crayclang/14.0/
+    NETCDF_FORTRAN_DIR=/opt/cray/pe/netcdf/4.9.0.7/crayclang/14.0/
     #FFTW_DOUBLE_LIB=/opt/cray/pe/fftw/3.3.8.9/x86_rome/lib/libfftw3.so
     #FFTW_FLOAT_LIB=/opt/cray/pe/fftw/3.3.8.9/x86_rome/lib/libfftw3f.so
 
@@ -79,11 +92,20 @@ path_to_build_dir="$(pwd)/build/$build_type"
 mkdir -p $path_to_build_dir
 pushd $path_to_build_dir
 cmake_build_type="$(capitalize $build_type)"
-FC=$FC cmake -DNETCDF_DIR=$NETCDF_DIR \
-             -DNETCDF_FORTRAN_DIR=$NETCDF_FORTRAN_DIR \
-             -DCMAKE_BUILD_TYPE=$cmake_build_type \
-	     -DFFTW_DOUBLE_OPENMP_LIB=$FFTW_DOUBLE_LIB \
-	     -DFFTW_FLOAT_OPENMP_LIB=$FFTW_FLOAT_LIB \
-              ../../ 2>&1 | tee -a $path_to_build_dir/config.log
+cmake_args=(
+    -DNETCDF_DIR="$NETCDF_DIR"
+    -DNETCDF_FORTRAN_DIR="$NETCDF_FORTRAN_DIR"
+    -DCMAKE_BUILD_TYPE="$cmake_build_type"
+)
+
+if [ -n "${FFTW_DOUBLE_LIB:-}" ]; then
+    cmake_args+=("-DFFTW_DOUBLE_OPENMP_LIB=$FFTW_DOUBLE_LIB")
+fi
+
+if [ -n "${FFTW_FLOAT_LIB:-}" ]; then
+    cmake_args+=("-DFFTW_FLOAT_OPENMP_LIB=$FFTW_FLOAT_LIB")
+fi
+
+FC=$FC cmake "${cmake_args[@]}" ../../ 2>&1 | tee -a $path_to_build_dir/config.log
 make -j$NPROC 2>&1 | tee -a $path_to_build_dir/build.log
 popd
