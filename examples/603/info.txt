@@ -1,0 +1,13 @@
+nfcts = 128
+nsolpts_u = 0
+nsolpts_v = 0
+nsolpts_w = 16384
+nsolpts_c = 0
+nbndpts_u = 16384
+nbndpts_v = 16384
+nbndpts_w = 16384
+nbndpts_c = 16384
+nfctsecs_u = 17788
+nfctsecs_v = 17788
+nfctsecs_w = 0
+nfctsecs_c = 16896
