@@ -93,7 +93,7 @@ bldT       = 301.0
 &TREES
 ltrees       = .true.
 itree_mode   = 99
-ntrees = 1
+ntrees = 150048
 cd           = 0.3
 lad          = 1.0
 lsize        = 0.15
