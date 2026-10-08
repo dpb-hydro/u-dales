@@ -1,27 +1,62 @@
 #!/bin/bash
 #PBS -N udales_run
-#PBS -l select=1:ncpus=8:mem=24gb
+#PBS -l select=1:ncpus=8:mpiprocs=8:ompthreads=1:mem=24gb
 #PBS -l walltime=02:00:00
 #PBS -j oe
 #PBS -o udales_run.log
 
-# Load shared software
-module load intel/2023a netCDF/4.9.2-iimpi-2023a netCDF-Fortran/4.6.1-iimpi-2023a FFTW/3.3.9-intel-2021a
+set -uo pipefail
 
-# Number of CPUs and job name
-export NCPU=8
+# ---------------- User settings ----------------
 EXPNAME=603
+NCPU=8 # must equal nprocx*nprocy in namoptions.$EXPNAME
+PROJECT_DIR="$HOME/uDALES"
+# -----------------------------------------------
 
-# Set folder names
-PROJECT_DIR=$HOME/uDALES
-export DA_TOOLSDIR=$PROJECT_DIR/u-dales/tools
-export DA_BUILD=$PROJECT_DIR/u-dales/build/release/u-dales
-export DA_WORKDIR=$TMPDIR/outputs
+CASE_DIR="$PROJECT_DIR/u-dales/examples/$EXPNAME"
+EXE="$PROJECT_DIR/u-dales/build/release/u-dales"
+WORK_DIR="$TMPDIR/outputs/$EXPNAME"
+RESULT_DIR="$EPHEMERAL/uDALES/outputs"
 
-# Run simulation
-mkdir -p $DA_WORKDIR
-$PROJECT_DIR/u-dales/tools/local_execute.sh $PROJECT_DIR/u-dales/examples/$EXPNAME || exit 1
+module load intel/2023a \
+            netCDF/4.9.2-iimpi-2023a \
+            netCDF-Fortran/4.6.1-iimpi-2023a \
+            FFTW/3.3.10-GCC-12.3.0
 
-# Copy outputs to EPHEMERAL
-mkdir -p $EPHEMERAL/uDALES/outputs
-cp -r $TMPDIR/outputs/$EXPNAME $EPHEMERAL/uDALES/outputs/
+export OMP_NUM_THREADS=1     # one MPI rank per core, no extra threads
+
+# Copy results back on any exit (success, failure or error), since $TMPDIR is wiped afterwards
+copy_results() {
+    mkdir -p "$RESULT_DIR"
+    cp -r "$WORK_DIR" "$RESULT_DIR/"
+}
+trap copy_results EXIT
+
+# Sanity checks before spending walltime
+[ -d "$CASE_DIR" ]  || { echo "Case folder not found: $CASE_DIR"; exit 1; }
+[ -x "$EXE" ]       || { echo "Executable not found: $EXE"; exit 1; }
+[ -f "$CASE_DIR/namoptions.$EXPNAME" ] || { echo "Missing namoptions.$EXPNAME"; exit 1; }
+
+# Check rank count against namoptions (skipped if the values can't be parsed)
+nx=$(sed -nE 's/^[[:space:]]*nprocx[[:space:]]*=[[:space:]]*([0-9]+).*/\1/p' "$CASE_DIR/namoptions.$EXPNAME" | head -n1)
+ny=$(sed -nE 's/^[[:space:]]*nprocy[[:space:]]*=[[:space:]]*([0-9]+).*/\1/p' "$CASE_DIR/namoptions.$EXPNAME" | head -n1)
+if [ -n "$nx" ] && [ -n "$ny" ] && [ $((nx*ny)) -ne "$NCPU" ]; then
+    echo "NCPU=$NCPU but nprocx*nprocy=$((nx*ny)) in namoptions.$EXPNAME"
+    exit 1
+fi
+
+# Set up working directory and run
+mkdir -p "$WORK_DIR"
+cp -r "$CASE_DIR"/. "$WORK_DIR"/
+cd "$WORK_DIR"
+
+echo "Starting uDALES case $EXPNAME on $NCPU ranks..."
+mpiexec -n "$NCPU" "$EXE" "namoptions.$EXPNAME" 2>&1 | tee -a "run.$EXPNAME.log"
+status=${PIPESTATUS[0]}
+
+if [ "$status" -eq 0 ]; then
+    echo "Simulation $EXPNAME finished successfully."
+else
+    echo "Simulation $EXPNAME FAILED with exit status $status."
+fi
+exit "$status"
